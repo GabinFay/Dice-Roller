@@ -17,7 +17,6 @@ contract Jackpot is Ownable {
     uint256 public jackpotBalance;
     uint256 public entryFee;
     uint256 public winProbability;
-    address public owner;
 
 
     event RandomNumberGenerated(uint256 randomNumber);
@@ -26,17 +25,12 @@ contract Jackpot is Ownable {
     event ProbabilityChanged(uint256 newProbability);
     event EntryFeeChanged(uint256 newEntryFee);
 
-    constructor(address _jackTokenAddress) {
+    constructor(address _jackTokenAddress) Ownable(msg.sender) {
         randomNumberGenerator = ContractRegistry.getRandomNumberV2();
         jackToken = IERC20(_jackTokenAddress);
         entryFee = 1; // 1 JACK token as entry fee (assuming 1 decimals)
         winProbability = 100; // 1/100 chance to win
     }
-
-    // modifier onlyOwner() {
-    //     require(msg.sender == owner, "Only owner can call this function");
-    //     _;
-    // }
 
     /**
      * @notice Enter the Jackpot game.

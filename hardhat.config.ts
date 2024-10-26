@@ -53,7 +53,7 @@ const config: HardhatUserConfig = {
         ],
     },
     networks: {
-        'flare-coston2_testnet': {
+        'flare-coston2-testnet': {
             url: process.env.RPC_URL_FLARE_COSTON2 || 'https://coston2-api.flare.network/ext/C/rpc',
             accounts,
             chainId: 114,

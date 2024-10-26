@@ -15,11 +15,11 @@ async function main() {
 
   // Deploy your Lottery contract
   // Assuming you have a Lottery contract, replace "Lottery" with your actual contract name
-  const Jackpot = await hre.ethers.getContractFactory("Jackpot");
-  const jackpot = await Jackpot.deploy(jackToken.address);
-  await jackpot.deployed();
+  // const Jackpot = await hre.ethers.getContractFactory("Jackpot");
+  // const jackpot = await Jackpot.deploy(jackToken.address);
+  // await jackpot.deployed();
 
-  console.log("Jackpot deployed to:", jackpot.address);
+  // console.log("Jackpot deployed to:", jackpot.address);
 }
 
 main()
