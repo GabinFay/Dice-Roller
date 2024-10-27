@@ -3,11 +3,13 @@ import { ethers } from 'ethers';
 // import * as ethers from 'ethers';
 console.log('Ethers:', ethers);
 import JackpotABI from './json/JackpotABI.json';
+import JACKTokenABI from './json/JACKTokenABI.json';
 import logo from './assets/logo.svg';
 import './AnimatedBackground.css';
 import confetti from 'canvas-confetti';
 
 const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
+const JACK_TOKEN_ADDRESS = import.meta.env.VITE_JACK_TOKEN_ADDRESS || '';
 const FLARE_COSTON2_RPC = 'https://coston2-api.flare.network/ext/C/rpc';
 const FLARE_COSTON2_CHAIN_ID = 114;
 const OWNER_PRIVATE_KEY = import.meta.env.VITE_OWNER_PRIVATE_KEY || '';
@@ -24,6 +26,8 @@ function App() {
   const [isRolling, setIsRolling] = useState<boolean>(false);
   const [lastRollResult, setLastRollResult] = useState<string | null>(null);
   const [networkError, setNetworkError] = useState<string | null>(null);
+  const [jackTokenContract, setJackTokenContract] = useState<ethers.Contract | null>(null);
+  const [isApproved, setIsApproved] = useState<boolean>(false);
 
   useEffect(() => {
     const initializeProvider = async () => {
@@ -113,6 +117,13 @@ function App() {
         const userJackpotContract = new ethers.Contract(CONTRACT_ADDRESS, JackpotABI, signer);
         setUserContract(userJackpotContract);
 
+        const userJackTokenContract = new ethers.Contract(JACK_TOKEN_ADDRESS, JACKTokenABI, signer);
+        setJackTokenContract(userJackTokenContract);
+
+        // Check if the contract is approved to spend tokens
+        const allowance = await userJackTokenContract.allowance(address, CONTRACT_ADDRESS);
+        setIsApproved(allowance.gte(ethers.utils.parseEther(entryFee)));
+
         setNetworkError(null);
       } catch (error) {
         console.error("Failed to connect wallet:", error);
@@ -120,6 +131,18 @@ function App() {
       }
     } else {
       setNetworkError("Please install MetaMask or another Web3 wallet");
+    }
+  };
+
+  const approveContract = async () => {
+    if (!jackTokenContract || !userContract) return;
+    try {
+      const tx = await jackTokenContract.approve(CONTRACT_ADDRESS, ethers.constants.MaxUint256);
+      await tx.wait();
+      setIsApproved(true);
+    } catch (error) {
+      console.error('Error approving contract:', error);
+      alert('Error approving contract. Please try again.');
     }
   };
 
@@ -142,6 +165,11 @@ function App() {
     if (!userContract) return;
     try {
       setIsRolling(true);
+      
+      if (!isApproved) {
+        await approveContract();
+      }
+
       const tx = await userContract.enterJackpot();
       const receipt = await tx.wait();
       
@@ -199,6 +227,13 @@ function App() {
                 onClick={connectWallet}
               >
                 Connect Wallet
+              </button>
+            ) : !isApproved ? (
+              <button
+                className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
+                onClick={approveContract}
+              >
+                Approve JACK Token
               </button>
             ) : (
               <button
