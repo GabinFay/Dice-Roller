@@ -1,4 +1,10 @@
-import React, { useState, useEffect } from 'react';
+declare global {
+  interface Window {
+    ethereum?: any;
+  }
+}
+
+import { useState, useEffect } from 'react';
 import { ethers } from 'ethers';
 // import * as ethers from 'ethers';
 console.log('Ethers:', ethers);
@@ -15,9 +21,7 @@ const FLARE_COSTON2_CHAIN_ID = 114;
 const OWNER_PRIVATE_KEY = import.meta.env.VITE_OWNER_PRIVATE_KEY || '';
 
 function App() {
-  const [provider, setProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
   const [contract, setContract] = useState<ethers.Contract | null>(null);
-  const [userProvider, setUserProvider] = useState<ethers.providers.Web3Provider | null>(null);
   const [userContract, setUserContract] = useState<ethers.Contract | null>(null);
   const [account, setAccount] = useState<string | null>(null);
   const [jackpotBalance, setJackpotBalance] = useState<string>('0');
@@ -35,8 +39,6 @@ function App() {
   useEffect(() => {
     const initializeProvider = async () => {
       const provider = new ethers.providers.JsonRpcProvider(FLARE_COSTON2_RPC);
-      setProvider(provider);
-
       const wallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
       const jackpotContract = new ethers.Contract(CONTRACT_ADDRESS, JackpotABI, wallet);
       setContract(jackpotContract);
@@ -59,7 +61,6 @@ function App() {
 
   const handleChainChanged = async (chainId: string) => {
     // Reset user-specific state
-    setUserProvider(null);
     setUserContract(null);
     setAccount(null);
 
@@ -112,7 +113,6 @@ function App() {
           }
         }
 
-        setUserProvider(web3Provider);
         const signer = web3Provider.getSigner();
         const address = await signer.getAddress();
         setAccount(address);
@@ -196,11 +196,10 @@ function App() {
       
       await updateJackpotInfo(contract!);
       await updateUserJackBalance();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rolling dice:', error);
       if (error.code === 'NETWORK_ERROR') {
         setNetworkError("Network changed. Please reconnect your wallet.");
-        setUserProvider(null);
         setUserContract(null);
         setAccount(null);
       } else {

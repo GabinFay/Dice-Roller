@@ -26,12 +26,18 @@ contract Jackpot is Ownable {
         bytes21(0x014554482f55534400000000000000000000000000)  // ETH/USD
     ];
 
+    uint256 public constant INITIAL_JACKPOT = 10 ether; // 10 JACK tokens (assuming 18 decimals)
+    uint256 public constant JACKPOT_RETENTION_PERCENTAGE = 10; // 10% retention
+
+    uint256 public initialJackpot;
+
     event RandomNumberGenerated(uint256 randomNumber, uint256 timestamp);
     event JackpotEntered(address player);
     event JackpotWon(address winner, uint256 amount);
     event ProbabilityChanged(uint256 newProbability);
     event EntryFeeChanged(uint256 newEntryFee);
     event AirdropRequested(address recipient, uint256 amount);
+    event NewLotteryCreated(uint256 initialAmount);
 
     constructor(address _jackTokenAddress) Ownable(msg.sender) {
         randomNumberGenerator = ContractRegistry.getRandomNumberV2();
@@ -39,6 +45,7 @@ contract Jackpot is Ownable {
         entryFee = 1 ether; // 1 JACK token as entry fee (assuming 18 decimals)
         winProbability = 100; // 1/100 chance to win
         ftsoV2 = ContractRegistry.getTestFtsoV2();
+        initialJackpot = 10 ether; // Set initial jackpot to 10 JACK tokens
     }
 
     function getSecureRandomNumber()
@@ -74,10 +81,15 @@ contract Jackpot is Ownable {
 
         if (randomNumber % winProbability == 0) {
             // Winner!
-            uint256 prize = jackpotBalance + entryFee;
-            jackpotBalance = 0;
-            require(jackToken.transfer(msg.sender, prize), "Failed to send prize");
-            emit JackpotWon(msg.sender, prize);
+            uint256 totalPrize = jackpotBalance + entryFee;
+            uint256 winnerPrize = (totalPrize * (100 - JACKPOT_RETENTION_PERCENTAGE)) / 100;
+            
+            require(jackToken.transfer(msg.sender, winnerPrize), "Failed to send prize");
+            emit JackpotWon(msg.sender, winnerPrize);
+
+            // Create new lottery with initial jackpot
+            jackpotBalance = initialJackpot;
+            emit NewLotteryCreated(initialJackpot);
         } else {
             // No win, add to jackpot
             jackpotBalance += entryFee;
@@ -138,5 +150,21 @@ contract Jackpot is Ownable {
         require(jackToken.balanceOf(address(this)) >= airdropAmount, "Insufficient tokens for airdrop");
         require(jackToken.transfer(msg.sender, airdropAmount), "Airdrop transfer failed");
         emit AirdropRequested(msg.sender, airdropAmount);
+    }
+
+    function setInitialJackpot(uint256 _newInitialJackpot) external onlyOwner {
+        require(_newInitialJackpot > 0, "Initial jackpot must be greater than 0");
+        initialJackpot = _newInitialJackpot;
+    }
+
+    function getContractBalance() external view returns (uint256) {
+        return jackToken.balanceOf(address(this));
+    }
+
+    function initializeJackpot() external onlyOwner {
+        require(jackpotBalance == 0, "Jackpot already initialized");
+        require(jackToken.transferFrom(msg.sender, address(this), initialJackpot), "Initial jackpot transfer failed");
+        jackpotBalance = initialJackpot;
+        emit NewLotteryCreated(initialJackpot);
     }
 }
