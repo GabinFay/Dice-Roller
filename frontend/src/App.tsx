@@ -1,220 +1,188 @@
-import React, { useState, useEffect } from 'react'
-import FallingCoin from './components/UI/FallingCoin'
-import PolyLotteryABI from './json/PolyLotteryABI.json'
-import lastWinnerData from './json/lastWinner.json'
-import lotteryInfoData from './json/lotteryInfo.json'
-import { useEnsName } from 'wagmi'
-import logo from './assets/logo.svg'
+import React, { useState, useEffect } from 'react';
+import { ethers } from 'ethers';
+// import * as ethers from 'ethers';
+console.log('Ethers:', ethers);
+import JackpotABI from './json/JackpotABI.json';
+import logo from './assets/logo.svg';
 import './AnimatedBackground.css';
+import confetti from 'canvas-confetti';
 
-const INFURA_API_KEY = process.env.REACT_APP_INFURA_API_KEY;
-
-if (!INFURA_API_KEY) {
-  console.error("Infura API key is not set in the .env file");
-}
-
-import { DynamicWidget, DynamicContextProvider, useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
-import { isEthereumWallet } from '@dynamic-labs/ethereum'
-import { WalletClient, formatEther } from 'viem'
-import { getContract } from 'viem'
-import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
-
-
-// Replace the hardcoded CONTRACT_ADDRESS with:
-const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || '';
-
-if (!CONTRACT_ADDRESS) {
-  console.error("Contract address is not set in the .env file");
-}
-
-const SUPPORTED_NETWORKS = {
-  FLARE_COSTON: 14,
-  FLARE_COSTON2: 114,
-}
-
-// Add this configuration object
-const dynamicNetworkConfig = {
-  evmNetworks: [
-    {
-      chainId: SUPPORTED_NETWORKS.FLARE_COSTON2,
-      chainName: 'Flare Coston2',
-      nativeCurrency: {
-        name: 'Coston2 Flare',
-        symbol: 'C2FLR',
-        decimals: 18,
-      },
-      rpcUrls: ['https://coston2-api.flare.network/ext/C/rpc'],
-      blockExplorerUrls: ['https://coston2-explorer.flare.network'],
-    },
-    // Add Flare Coston if needed
-    {
-      chainId: SUPPORTED_NETWORKS.FLARE_COSTON,
-      chainName: 'Flare Coston',
-      nativeCurrency: {
-        name: 'Coston Flare',
-        symbol: 'CFLR',
-        decimals: 18,
-      },
-      rpcUrls: ['https://coston-api.flare.network/ext/C/rpc'],
-      blockExplorerUrls: ['https://coston-explorer.flare.network'],
-    },
-  ],
-};
+const CONTRACT_ADDRESS = import.meta.env.VITE_CONTRACT_ADDRESS || '';
+const FLARE_COSTON2_RPC = 'https://coston2-api.flare.network/ext/C/rpc';
+const FLARE_COSTON2_CHAIN_ID = 114;
+const OWNER_PRIVATE_KEY = import.meta.env.VITE_OWNER_PRIVATE_KEY || '';
 
 function App() {
-  const [jackpotBalance, setJackpotBalance] = useState<string>('0')
-  const [entryFee, setEntryFee] = useState<string>('0')
-  const [winProbability, setWinProbability] = useState<number>(0)
-  const [lastWinner, setLastWinner] = useState<string>('')
-  const [lastWinAmount, setLastWinAmount] = useState<string>('0')
-  const [ticketCount, setTicketCount] = useState<number>(1)
-  const [fallingCoins, setFallingCoins] = useState<{ id: number; left: number }[]>([])
-  const [contract, setContract] = useState<Contract | null>(null)
-  const [isConnected, setIsConnected] = useState(false)
-  const isLoggedIn = useIsLoggedIn()
-  const { setShowAuthFlow, handleLogOut, user } = useDynamicContext();
-  const [isAnimating, setIsAnimating] = useState(false);
-  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
+  const [provider, setProvider] = useState<ethers.providers.JsonRpcProvider | null>(null);
+  const [contract, setContract] = useState<ethers.Contract | null>(null);
+  const [userProvider, setUserProvider] = useState<ethers.providers.Web3Provider | null>(null);
+  const [userContract, setUserContract] = useState<ethers.Contract | null>(null);
+  const [account, setAccount] = useState<string | null>(null);
+  const [jackpotBalance, setJackpotBalance] = useState<string>('0');
+  const [entryFee, setEntryFee] = useState<string>('0');
+  const [winProbability, setWinProbability] = useState<number>(0);
+  const [isRolling, setIsRolling] = useState<boolean>(false);
+  const [lastRollResult, setLastRollResult] = useState<string | null>(null);
+  const [networkError, setNetworkError] = useState<string | null>(null);
 
   useEffect(() => {
-    const init = async () => {
-      if (isLoggedIn) {
-        if (primaryWallet && isEthereumWallet(primaryWallet)) {
-        const walletClient = await primaryWallet.getWalletClient()
+    const initializeProvider = async () => {
+      const provider = new ethers.providers.JsonRpcProvider(FLARE_COSTON2_RPC);
+      setProvider(provider);
 
-        setUpContract(walletClient)
-      }
-      }
-    }
-    init()
+      const wallet = new ethers.Wallet(OWNER_PRIVATE_KEY, provider);
+      const jackpotContract = new ethers.Contract(CONTRACT_ADDRESS, JackpotABI, wallet);
+      setContract(jackpotContract);
 
-    const timer = setInterval(() => {
-      const now = new Date()
-      const nextMonday = new Date(now)
-      nextMonday.setDate(now.getDate() + ((1 + 7 - now.getDay()) % 7 || 7))
-      nextMonday.setHours(7, 0, 0, 0)
-      
-      const timeDiff = nextMonday.getTime() - now.getTime()
-      
-      if (timeDiff > 0) {
-        const days = Math.floor(timeDiff / (1000 * 60 * 60 * 24))
-        const hours = Math.floor((timeDiff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60))
-        const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60))
-        const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000)
-        
-        setTimeLeft(`${days}d ${hours}h ${minutes}m ${seconds}s`)
-      } else {
-        setTimeLeft('Drawing now!')
-      }
-    }, 1000)
-
-    const checkNetwork = async () => {
-      if (window.ethereum) {
-        const chainId = await window.ethereum.request({ method: 'eth_chainId' });
-        setCurrentChainId(parseInt(chainId, 16));
-      }
+      await updateJackpotInfo(jackpotContract);
     };
 
-    checkNetwork();
+    initializeProvider();
 
     if (window.ethereum) {
-      window.ethereum.on('chainChanged', checkNetwork);
+      window.ethereum.on('chainChanged', handleChainChanged);
     }
 
     return () => {
       if (window.ethereum) {
-        window.ethereum.removeListener('chainChanged', checkNetwork);
+        window.ethereum.removeListener('chainChanged', handleChainChanged);
       }
     };
-  }, [])
+  }, []);
 
-  const setUpContract = async (walletClient: WalletClient) => {
-    const jackpotContract = getContract({
-      address: CONTRACT_ADDRESS,
-      abi: JackpotABI,
-      client: walletClient,
-    })
-    
-    setContract(jackpotContract)
-    setIsConnected(true)
-    updateJackpotInfo(jackpotContract)
-  }
+  const handleChainChanged = async (chainId: string) => {
+    // Reset user-specific state
+    setUserProvider(null);
+    setUserContract(null);
+    setAccount(null);
 
-  const updateJackpotInfo = async (jackpotContract: Contract) => {
-    const balance = await jackpotContract.read.getJackpotBalance()
-    setJackpotBalance(formatEther(balance.toString()))
-
-    const fee = await jackpotContract.read.getEntryFee()
-    setEntryFee(formatEther(fee.toString()))
-
-    const probability = await jackpotContract.read.getWinProbability()
-    setWinProbability(probability.toNumber())
-  }
-
-  const isSupportedNetwork = () => {
-    return (
-      currentChainId === SUPPORTED_NETWORKS.FLARE_COSTON ||
-      currentChainId === SUPPORTED_NETWORKS.FLARE_COSTON2
-    );
+    if (parseInt(chainId, 16) === FLARE_COSTON2_CHAIN_ID) {
+      setNetworkError(null);
+      await connectWallet();
+    } else {
+      setNetworkError("Please connect to the Flare Coston2 testnet");
+    }
   };
 
-  const enterJackpot = async () => {
-    if (!contract) return;
-    if (!isSupportedNetwork()) {
-      alert('Please connect to a supported network (Flare Coston or Flare Coston2) to enter the Jackpot.');
-      return;
+  const connectWallet = async () => {
+    if (window.ethereum) {
+      try {
+        const web3Provider = new ethers.providers.Web3Provider(window.ethereum);
+        await web3Provider.send("eth_requestAccounts", []);
+        
+        const network = await web3Provider.getNetwork();
+        if (network.chainId !== FLARE_COSTON2_CHAIN_ID) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_switchEthereumChain',
+              params: [{ chainId: `0x${FLARE_COSTON2_CHAIN_ID.toString(16)}` }],
+            });
+          } catch (switchError: any) {
+            if (switchError.code === 4902) {
+              try {
+                await window.ethereum.request({
+                  method: 'wallet_addEthereumChain',
+                  params: [
+                    {
+                      chainId: `0x${FLARE_COSTON2_CHAIN_ID.toString(16)}`,
+                      chainName: 'Flare Coston2 Testnet',
+                      nativeCurrency: {
+                        name: 'Coston2 Flare',
+                        symbol: 'C2FLR',
+                        decimals: 18
+                      },
+                      rpcUrls: [FLARE_COSTON2_RPC],
+                      blockExplorerUrls: ['https://coston2-explorer.flare.network/'],
+                    },
+                  ],
+                });
+              } catch (addError) {
+                throw new Error("Failed to add the Flare Coston2 network");
+              }
+            } else {
+              throw new Error("Failed to switch to the Flare Coston2 network");
+            }
+          }
+        }
+
+        setUserProvider(web3Provider);
+        const signer = web3Provider.getSigner();
+        const address = await signer.getAddress();
+        setAccount(address);
+
+        const userJackpotContract = new ethers.Contract(CONTRACT_ADDRESS, JackpotABI, signer);
+        setUserContract(userJackpotContract);
+
+        setNetworkError(null);
+      } catch (error) {
+        console.error("Failed to connect wallet:", error);
+        setNetworkError("Failed to connect wallet. Please try again.");
+      }
+    } else {
+      setNetworkError("Please install MetaMask or another Web3 wallet");
     }
+  };
+
+  const updateJackpotInfo = async (jackpotContract: ethers.Contract) => {
     try {
-      const price = await contract.read.ticketPrice()
-      const totalCost = price.mul(ticketCount)
-      const tx = await contract.write.buyTickets(ticketCount, { value: totalCost })
-      await tx.wait()
-      alert('Tickets purchased successfully!')
-      updateLotteryInfo(contract)
+      const balance = await jackpotContract.getJackpotBalance();
+      setJackpotBalance(ethers.utils.formatEther(balance));
+
+      const fee = await jackpotContract.getEntryFee();
+      setEntryFee(ethers.utils.formatEther(fee));
+
+      const probability = await jackpotContract.getWinProbability();
+      setWinProbability(probability.toNumber());
     } catch (error) {
-      console.error('Error buying tickets:', error)
-      alert('Error buying tickets. Please try again.')
-    }
-  }
-
-  const adjustTicketCount = (amount: number) => {
-    setPrevTicketCount(ticketCount);
-    setTicketCount((prev) => Math.max(1, prev + amount));
-    setIsAnimating(true);
-    setTimeout(() => setIsAnimating(false), 150); // Reset after 0.1 seconds
-    if (amount > 0) {
-      const coinCount = Math.floor(Math.random() * 4) + 1;
-      const newCoins = Array.from({ length: coinCount }, () => ({
-        id: Date.now() + Math.random(),
-        left: Math.random() * window.innerWidth,
-      }));
-      setFallingCoins((prevCoins) => [...prevCoins, ...newCoins]);
+      console.error("Error updating jackpot info:", error);
     }
   };
 
-  const removeCoin = (id: number) => {
-    setFallingCoins((prevCoins) => prevCoins.filter((coin) => coin.id !== id));
+  const rollDice = async () => {
+    if (!userContract) return;
+    try {
+      setIsRolling(true);
+      const tx = await userContract.enterJackpot();
+      const receipt = await tx.wait();
+      
+      const winEvent = receipt.events?.find((event: any) => event.event === 'JackpotWon');
+      if (winEvent) {
+        setLastRollResult('You won!');
+        confetti({
+          particleCount: 100,
+          spread: 70,
+          origin: { y: 0.6 }
+        });
+      } else {
+        setLastRollResult('You lost. Try again!');
+      }
+      
+      await updateJackpotInfo(contract!);
+    } catch (error) {
+      console.error('Error rolling dice:', error);
+      if (error.code === 'NETWORK_ERROR') {
+        setNetworkError("Network changed. Please reconnect your wallet.");
+        setUserProvider(null);
+        setUserContract(null);
+        setAccount(null);
+      } else {
+        alert('Error rolling dice. Please try again.');
+      }
+    } finally {
+      setIsRolling(false);
+    }
   };
-
-  const { data: winnerEnsName } = useEnsName({
-    address: lastWinner as `0x${string}`,
-  })
 
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       <div className="animated-background"></div>
       <div className="relative z-10 min-h-screen text-white flex flex-col items-center justify-start p-4 w-full">
         <img src={logo} alt="Jackpot Logo" className="absolute top-8 left-8 w-20 h-20" />
-        <div className="absolute top-8 right-8">
-          <DynamicWidget />
-        </div>
         <h1 className="text-6xl font-bold mb-16 text-yellow-400 mt-5">Jackpot</h1>
         <div className="rounded-lg max-w-4xl w-full">
           <div className="p-8 flex justify-between items-center">
             <h2 className="text-3xl font-semibold text-white">Current Jackpot:</h2>
-            <p className="text-4xl font-bold text-green-400">
-              {jackpotBalance} JACK
-            </p>
+            <p className="text-4xl font-bold text-green-400">{jackpotBalance} JACK</p>
           </div>
           <div className="p-8 flex justify-between items-center">
             <h2 className="text-3xl font-semibold text-white">Entry Fee:</h2>
@@ -224,29 +192,42 @@ function App() {
             <h2 className="text-3xl font-semibold text-white">Win Probability:</h2>
             <p className="text-4xl font-bold text-yellow-400">1 in {winProbability}</p>
           </div>
-          <div className="mt-12 flex justify-center mb-6 items-end p-10 bg-black bg-opacity-50">
-            <button
-              className="bg-yellow-400 hover:bg-yellow-500 text-black px-8 py-3 rounded-lg font-bold text-xl"
-              onClick={enterJackpot}
-              disabled={!isConnected || !isSupportedNetwork()}
-            >
-              Enter Jackpot ({entryFee} JACK)
-            </button>
-          </div>
-          <div className="text-center p-6 bg-black bg-opacity-50">
-            <h2 className="text-3xl font-semibold mb-6">Last Winner</h2>
-            <p className="text-green-400 font-mono text-3xl mb-3">
-              {winnerEnsName || lastWinner}
-            </p>
-            <p className="text-yellow-400 font-mono text-3xl">
-              Won: {lastWinAmount} JACK
-            </p>
+          <div className="mt-12 flex flex-col items-center justify-center space-y-4 p-10 bg-black bg-opacity-50">
+            {!account ? (
+              <button
+                className="bg-blue-500 hover:bg-blue-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
+                onClick={connectWallet}
+              >
+                Connect Wallet
+              </button>
+            ) : (
+              <button
+                className="bg-yellow-400 hover:bg-yellow-500 text-black px-8 py-3 rounded-lg font-bold text-xl"
+                onClick={rollDice}
+                disabled={isRolling}
+              >
+                {isRolling ? 'Rolling...' : `Roll the Dice (${entryFee} JACK)`}
+              </button>
+            )}
+            {lastRollResult && (
+              <p className="text-2xl font-bold mt-4">{lastRollResult}</p>
+            )}
           </div>
         </div>
+        {account && (
+          <div className="mt-4 p-4 bg-black bg-opacity-50 rounded-lg">
+            <h3 className="text-xl font-semibold mb-2">Connected Address:</h3>
+            <p className="font-mono text-sm break-all">{account}</p>
+          </div>
+        )}
+        {networkError && (
+          <div className="absolute top-0 left-0 right-0 bg-red-500 text-white p-2 text-center">
+            {networkError}
+          </div>
+        )}
       </div>
     </div>
-  )
+  );
 }
 
-// Remove the AppWithDynamicContext wrapper and export App directly
 export default App;

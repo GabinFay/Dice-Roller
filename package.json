@@ -72,6 +72,7 @@
   },
   "dependencies": {
     "@chainlink/contracts": "^1.2.0",
-    "@flarenetwork/flare-periphery-contracts": "^0.1.16"
+    "@flarenetwork/flare-periphery-contracts": "^0.1.16",
+    "canvas-confetti": "^1.9.3"
   }
 }

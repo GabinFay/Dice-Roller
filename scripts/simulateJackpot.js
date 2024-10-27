@@ -31,24 +31,32 @@ async function main() {
   await approveTx.wait();
   console.log("Approved Jackpot contract to spend JACK tokens");
 
-  // Enter the Jackpot
-  console.log("Entering the Jackpot...");
-  const enterTx = await jackpot.connect(player).enterJackpot();
-  const receipt = await enterTx.wait();
+  // Request airdrop
+  console.log("Requesting airdrop...");
+  const airdropTx = await jackpot.connect(player).requestAirdrop();
+  await airdropTx.wait();
+  console.log("Airdrop of 100 JACK tokens received");
 
-  const randomNumberEvent = receipt.events?.find(e => e.event === "RandomNumberGenerated");
-  console.log("Random number:", randomNumberEvent.args[0]);
+  // Get player's JACK token balance
+  const playerBalance = await jackToken.balanceOf(player.address);
+  console.log("Player's JACK token balance:", hre.ethers.utils.formatEther(playerBalance), "JACK");
+
+  // Roll the dice (enter Jackpot)
+  console.log("Rolling the dice...");
+  const rollTx = await jackpot.connect(player).enterJackpot();
+  const receipt = await rollTx.wait();
+
   // Check for events in the transaction receipt
   const jackpotWonEvent = receipt.events?.find(e => e.event === "JackpotWon");
   const jackpotEnteredEvent = receipt.events?.find(e => e.event === "JackpotEntered");
 
   if (jackpotWonEvent) {
-    console.log("Congratulations! You won the Jackpot!");
+    console.log("Congratulations! You won the roll!");
     const [winner, amount] = jackpotWonEvent.args;
     console.log("Winner:", winner);
     console.log("Amount won:", hre.ethers.utils.formatEther(amount), "JACK");
   } else if (jackpotEnteredEvent) {
-    console.log("You entered the Jackpot, but didn't win this time.");
+    console.log("You lost the roll. Better luck next time!");
   } else {
     console.log("Something unexpected happened. Check the transaction receipt for details.");
   }

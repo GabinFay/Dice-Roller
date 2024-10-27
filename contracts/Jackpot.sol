@@ -31,6 +31,7 @@ contract Jackpot is Ownable {
     event JackpotWon(address winner, uint256 amount);
     event ProbabilityChanged(uint256 newProbability);
     event EntryFeeChanged(uint256 newEntryFee);
+    event AirdropRequested(address recipient, uint256 amount);
 
     constructor(address _jackTokenAddress) Ownable(msg.sender) {
         randomNumberGenerator = ContractRegistry.getRandomNumberV2();
@@ -84,8 +85,6 @@ contract Jackpot is Ownable {
         }
     }
 
-
-
     /**
      * @notice Set the win probability.
      * @param _newProbability The new win probability (e.g., 100 for 1/100 chance)
@@ -132,5 +131,12 @@ contract Jackpot is Ownable {
 
     function withdrawTokens(uint256 amount) external onlyOwner {
         require(jackToken.transfer(owner(), amount), "Token transfer failed");
+    }
+
+    function requestAirdrop() external {
+        uint256 airdropAmount = 100 * 10**18; // 100 JACK tokens
+        require(jackToken.balanceOf(address(this)) >= airdropAmount, "Insufficient tokens for airdrop");
+        require(jackToken.transfer(msg.sender, airdropAmount), "Airdrop transfer failed");
+        emit AirdropRequested(msg.sender, airdropAmount);
     }
 }

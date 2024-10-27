@@ -43,7 +43,3 @@ contract FtsoV2FeedConsumer {
         return ftsoV2.getFeedsById(feedIds);
     }
 }
-
-
-
-
