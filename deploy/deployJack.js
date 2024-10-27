@@ -7,7 +7,7 @@ async function main() {
 
   // Deploy JACKToken
   const JACKToken = await hre.ethers.getContractFactory("JACKToken");
-  const initialSupply = hre.ethers.utils.parseUnits("1000000", 1); // 1 million JACK tokens, integer
+  const initialSupply = hre.ethers.utils.parseUnits("1000000", 18); // 1 million JACK tokens with 18 decimals
   const jackToken = await JACKToken.deploy(initialSupply);
   await jackToken.deployed();
 
