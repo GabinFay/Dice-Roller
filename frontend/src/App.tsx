@@ -4,7 +4,7 @@ import { ethers } from 'ethers';
 console.log('Ethers:', ethers);
 import JackpotABI from './json/JackpotABI.json';
 import JACKTokenABI from './json/JACKTokenABI.json';
-import logo from './assets/logo.svg';
+import logo from './assets/dice.png';
 import './AnimatedBackground.css';
 import confetti from 'canvas-confetti';
 
@@ -28,6 +28,9 @@ function App() {
   const [networkError, setNetworkError] = useState<string | null>(null);
   const [jackTokenContract, setJackTokenContract] = useState<ethers.Contract | null>(null);
   const [isApproved, setIsApproved] = useState<boolean>(false);
+  const [userJackBalance, setUserJackBalance] = useState<string>('0');
+  const [isRequestingAirdrop, setIsRequestingAirdrop] = useState<boolean>(false);
+  const [userC2FLRBalance, setUserC2FLRBalance] = useState<string>('0');
 
   useEffect(() => {
     const initializeProvider = async () => {
@@ -124,6 +127,12 @@ function App() {
         const allowance = await userJackTokenContract.allowance(address, CONTRACT_ADDRESS);
         setIsApproved(allowance.gte(ethers.utils.parseEther(entryFee)));
 
+        // Update user's JACK balance
+        await updateUserJackBalance();
+
+        // Update user's C2FLR balance
+        await updateUserC2FLRBalance(web3Provider, address);
+
         setNetworkError(null);
       } catch (error) {
         console.error("Failed to connect wallet:", error);
@@ -186,6 +195,7 @@ function App() {
       }
       
       await updateJackpotInfo(contract!);
+      await updateUserJackBalance();
     } catch (error) {
       console.error('Error rolling dice:', error);
       if (error.code === 'NETWORK_ERROR') {
@@ -201,11 +211,53 @@ function App() {
     }
   };
 
+  const updateUserJackBalance = async () => {
+    if (jackTokenContract && account) {
+      try {
+        const balance = await jackTokenContract.balanceOf(account);
+        setUserJackBalance(ethers.utils.formatEther(balance));
+      } catch (error) {
+        console.error("Error fetching user JACK balance:", error);
+      }
+    }
+  };
+
+  const updateUserC2FLRBalance = async (provider: ethers.providers.Web3Provider, address: string) => {
+    try {
+      const balance = await provider.getBalance(address);
+      setUserC2FLRBalance(ethers.utils.formatEther(balance));
+    } catch (error) {
+      console.error("Error fetching user C2FLR balance:", error);
+    }
+  };
+
+  useEffect(() => {
+    if (jackTokenContract && account) {
+      updateUserJackBalance();
+    }
+  }, [jackTokenContract, account]);
+
+  const requestAirdrop = async () => {
+    if (!userContract) return;
+    try {
+      setIsRequestingAirdrop(true);
+      const tx = await userContract.requestAirdrop();
+      await tx.wait();
+      await updateUserJackBalance();
+      alert('Airdrop of 100 JACK tokens successful!');
+    } catch (error) {
+      console.error('Error requesting airdrop:', error);
+      alert('Error requesting airdrop. Please try again.');
+    } finally {
+      setIsRequestingAirdrop(false);
+    }
+  };
+
   return (
     <div className="relative min-h-screen w-full overflow-hidden">
       <div className="animated-background"></div>
       <div className="relative z-10 min-h-screen text-white flex flex-col items-center justify-start p-4 w-full">
-        <img src={logo} alt="Jackpot Logo" className="absolute top-8 left-8 w-20 h-20" />
+        <img src={logo} alt="Dice Logo" className="absolute top-8 left-8 w-20 h-20" />
         <h1 className="text-6xl font-bold mb-16 text-yellow-400 mt-5">Jackpot</h1>
         <div className="rounded-lg max-w-4xl w-full">
           <div className="p-8 flex justify-between items-center">
@@ -228,21 +280,42 @@ function App() {
               >
                 Connect Wallet
               </button>
-            ) : !isApproved ? (
-              <button
-                className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
-                onClick={approveContract}
-              >
-                Approve JACK Token
-              </button>
             ) : (
-              <button
-                className="bg-yellow-400 hover:bg-yellow-500 text-black px-8 py-3 rounded-lg font-bold text-xl"
-                onClick={rollDice}
-                disabled={isRolling}
-              >
-                {isRolling ? 'Rolling...' : `Roll the Dice (${entryFee} JACK)`}
-              </button>
+              <>
+                {!isApproved ? (
+                  <button
+                    className="bg-green-500 hover:bg-green-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
+                    onClick={approveContract}
+                  >
+                    Approve JACK Token
+                  </button>
+                ) : (
+                  <button
+                    className="bg-yellow-400 hover:bg-yellow-500 text-black px-8 py-3 rounded-lg font-bold text-xl"
+                    onClick={rollDice}
+                    disabled={isRolling}
+                  >
+                    {isRolling ? 'Rolling...' : `Roll the Dice (${entryFee} JACK)`}
+                  </button>
+                )}
+                <button
+                  className="bg-purple-500 hover:bg-purple-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
+                  onClick={requestAirdrop}
+                  disabled={isRequestingAirdrop}
+                >
+                  {isRequestingAirdrop ? 'Requesting...' : 'Request 100 JACK Airdrop'}
+                </button>
+                {parseFloat(userC2FLRBalance) === 0 && (
+                  <a
+                    href="https://faucet.flare.network/coston2"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-orange-500 hover:bg-orange-600 text-white px-8 py-3 rounded-lg font-bold text-xl"
+                  >
+                    Get Testnet C2FLR
+                  </a>
+                )}
+              </>
             )}
             {lastRollResult && (
               <p className="text-2xl font-bold mt-4">{lastRollResult}</p>
@@ -253,6 +326,10 @@ function App() {
           <div className="mt-4 p-4 bg-black bg-opacity-50 rounded-lg">
             <h3 className="text-xl font-semibold mb-2">Connected Address:</h3>
             <p className="font-mono text-sm break-all">{account}</p>
+            <h3 className="text-xl font-semibold mt-4 mb-2">Your JACK Balance:</h3>
+            <p className="font-mono text-2xl">{userJackBalance} JACK</p>
+            <h3 className="text-xl font-semibold mt-4 mb-2">Your C2FLR Balance:</h3>
+            <p className="font-mono text-2xl">{userC2FLRBalance} C2FLR</p>
           </div>
         )}
         {networkError && (
