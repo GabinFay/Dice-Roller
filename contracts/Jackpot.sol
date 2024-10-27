@@ -5,6 +5,7 @@ import {ContractRegistry} from "@flarenetwork/flare-periphery-contracts/coston2/
 import {RandomNumberV2Interface} from "@flarenetwork/flare-periphery-contracts/coston2/RandomNumberV2Interface.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {TestFtsoV2Interface} from "@flarenetwork/flare-periphery-contracts/coston2/TestFtsoV2Interface.sol";
 
 /**
  * @title Jackpot
@@ -18,6 +19,12 @@ contract Jackpot is Ownable {
     uint256 public entryFee;
     uint256 public winProbability;
 
+    TestFtsoV2Interface internal ftsoV2;
+    bytes21[] public feedIds = [
+        bytes21(0x01464c522f55534400000000000000000000000000), // FLR/USD
+        bytes21(0x014254432f55534400000000000000000000000000), // BTC/USD
+        bytes21(0x014554482f55534400000000000000000000000000)  // ETH/USD
+    ];
 
     event RandomNumberGenerated(uint256 randomNumber, uint256 timestamp);
     event JackpotEntered(address player);
@@ -30,6 +37,7 @@ contract Jackpot is Ownable {
         jackToken = IERC20(_jackTokenAddress);
         entryFee = 1 ether; // 1 JACK token as entry fee (assuming 18 decimals)
         winProbability = 100; // 1/100 chance to win
+        ftsoV2 = ContractRegistry.getTestFtsoV2();
     }
 
     function getSecureRandomNumber()
@@ -38,9 +46,17 @@ contract Jackpot is Ownable {
         returns (uint256 randomNumber, bool isSecure, uint256 timestamp)
     {
         (randomNumber, isSecure, timestamp) = randomNumberGenerator.getRandomNumber();
-        /* DO NOT USE THE RANDOM NUMBER IF isSecure=false. */
         require(isSecure, "Random number is not secure");
-        /* Your custom RNG consumption logic. In this example the values are just returned. */
+
+        (uint256[] memory feedValues, , ) = ftsoV2.getFeedsById(feedIds);
+        
+        randomNumber = uint256(keccak256(abi.encodePacked(
+            feedValues[0],
+            feedValues[1],
+            feedValues[2],
+            randomNumber
+        )));
+
         return (randomNumber, isSecure, timestamp);
     }
 
