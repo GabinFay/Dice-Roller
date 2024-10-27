@@ -48,9 +48,17 @@ async function main() {
     const enterTx = await jackpot.connect(player).enterJackpot();
     const receipt = await enterTx.wait();
 
+    // Find the RandomNumberGenerated event
     const randomNumberEvent = receipt.events?.find(e => e.event === "RandomNumberGenerated");
-    console.log("Random number:", randomNumberEvent.args[0] % 3 );
-    // Check for events in the transaction receipt
+    if (randomNumberEvent) {
+      const [randomNumber, timestamp] = randomNumberEvent.args;
+      console.log("Random number:", randomNumber % 3);
+      console.log("Timestamp:", timestamp.toString());
+    } else {
+      console.log("RandomNumberGenerated event not found");
+    }
+
+    // Check for JackpotWon or JackpotEntered events
     const jackpotWonEvent = receipt.events?.find(e => e.event === "JackpotWon");
     const jackpotEnteredEvent = receipt.events?.find(e => e.event === "JackpotEntered");
 

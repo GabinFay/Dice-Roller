@@ -13,17 +13,53 @@ if (!INFURA_API_KEY) {
   console.error("Infura API key is not set in the .env file");
 }
 
-import { DynamicWidget, useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
+import { DynamicWidget, DynamicContextProvider, useDynamicContext, useIsLoggedIn } from "@dynamic-labs/sdk-react-core";
 import { isEthereumWallet } from '@dynamic-labs/ethereum'
 import { WalletClient, formatEther } from 'viem'
 import { getContract } from 'viem'
+import { EthereumWalletConnectors } from "@dynamic-labs/ethereum";
 
-const CONTRACT_ADDRESS = '0x7A224d709eD45DE4A0872EaE32cEDfD8Dcb7dBF8'
+
+// Replace the hardcoded CONTRACT_ADDRESS with:
+const CONTRACT_ADDRESS = process.env.REACT_APP_CONTRACT_ADDRESS || '';
+
+if (!CONTRACT_ADDRESS) {
+  console.error("Contract address is not set in the .env file");
+}
 
 const SUPPORTED_NETWORKS = {
-  FLARE_COSTON: 14, // Chain ID for Flare Coston testnet
-  FLARE_COSTON2: 114, // Chain ID for Flare Coston2 testnet
+  FLARE_COSTON: 14,
+  FLARE_COSTON2: 114,
 }
+
+// Add this configuration object
+const dynamicNetworkConfig = {
+  evmNetworks: [
+    {
+      chainId: SUPPORTED_NETWORKS.FLARE_COSTON2,
+      chainName: 'Flare Coston2',
+      nativeCurrency: {
+        name: 'Coston2 Flare',
+        symbol: 'C2FLR',
+        decimals: 18,
+      },
+      rpcUrls: ['https://coston2-api.flare.network/ext/C/rpc'],
+      blockExplorerUrls: ['https://coston2-explorer.flare.network'],
+    },
+    // Add Flare Coston if needed
+    {
+      chainId: SUPPORTED_NETWORKS.FLARE_COSTON,
+      chainName: 'Flare Coston',
+      nativeCurrency: {
+        name: 'Coston Flare',
+        symbol: 'CFLR',
+        decimals: 18,
+      },
+      rpcUrls: ['https://coston-api.flare.network/ext/C/rpc'],
+      blockExplorerUrls: ['https://coston-explorer.flare.network'],
+    },
+  ],
+};
 
 function App() {
   const [jackpotBalance, setJackpotBalance] = useState<string>('0')
@@ -32,15 +68,11 @@ function App() {
   const [lastWinner, setLastWinner] = useState<string>('')
   const [lastWinAmount, setLastWinAmount] = useState<string>('0')
   const [ticketCount, setTicketCount] = useState<number>(1)
-  const [prevTicketCount, setPrevTicketCount] = useState<number>(1)
-  const [timeLeft, setTimeLeft] = useState<string>('')
   const [fallingCoins, setFallingCoins] = useState<{ id: number; left: number }[]>([])
-  const [totalPrize, setTotalPrize] = useState(lotteryInfoData.currentJackpot)
-  const [ticketPrice, setTicketPrice] = useState(lotteryInfoData.ticketPrice)
   const [contract, setContract] = useState<Contract | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const isLoggedIn = useIsLoggedIn()
-  const {  primaryWallet } = useDynamicContext()
+  const { setShowAuthFlow, handleLogOut, user } = useDynamicContext();
   const [isAnimating, setIsAnimating] = useState(false);
   const [currentChainId, setCurrentChainId] = useState<number | null>(null);
 
@@ -216,4 +248,5 @@ function App() {
   )
 }
 
-export default App
+// Remove the AppWithDynamicContext wrapper and export App directly
+export default App;
