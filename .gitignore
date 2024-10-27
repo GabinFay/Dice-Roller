@@ -5,6 +5,9 @@ coverage.json
 typechain
 typechain-types
 
+archive
+
+
 # Foundry
 forge-cache/
 out/

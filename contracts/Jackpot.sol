@@ -19,7 +19,7 @@ contract Jackpot is Ownable {
     uint256 public winProbability;
 
 
-    event RandomNumberGenerated(uint256 randomNumber);
+    event RandomNumberGenerated(uint256 randomNumber, uint256 timestamp);
     event JackpotEntered(address player);
     event JackpotWon(address winner, uint256 amount);
     event ProbabilityChanged(uint256 newProbability);
@@ -28,8 +28,20 @@ contract Jackpot is Ownable {
     constructor(address _jackTokenAddress) Ownable(msg.sender) {
         randomNumberGenerator = ContractRegistry.getRandomNumberV2();
         jackToken = IERC20(_jackTokenAddress);
-        entryFee = 1; // 1 JACK token as entry fee (assuming 1 decimals)
+        entryFee = 1 ether; // 1 JACK token as entry fee (assuming 18 decimals)
         winProbability = 100; // 1/100 chance to win
+    }
+
+    function getSecureRandomNumber()
+        internal
+        view
+        returns (uint256 randomNumber, bool isSecure, uint256 timestamp)
+    {
+        (randomNumber, isSecure, timestamp) = randomNumberGenerator.getRandomNumber();
+        /* DO NOT USE THE RANDOM NUMBER IF isSecure=false. */
+        require(isSecure, "Random number is not secure");
+        /* Your custom RNG consumption logic. In this example the values are just returned. */
+        return (randomNumber, isSecure, timestamp);
     }
 
     /**
@@ -39,10 +51,9 @@ contract Jackpot is Ownable {
     function enterJackpot() external {
         require(jackToken.transferFrom(msg.sender, address(this), entryFee), "Token transfer failed");
 
-        (uint256 randomNumber, bool isSecure, ) = randomNumberGenerator.getRandomNumber();
-        require(isSecure, "Random number is not secure");
+        (uint256 randomNumber, bool isSecure, uint256 timestamp) = getSecureRandomNumber();
 
-        emit RandomNumberGenerated(randomNumber);
+        emit RandomNumberGenerated(randomNumber, timestamp);
 
         if (randomNumber % winProbability == 0) {
             // Winner!
@@ -56,6 +67,8 @@ contract Jackpot is Ownable {
             emit JackpotEntered(msg.sender);
         }
     }
+
+
 
     /**
      * @notice Set the win probability.

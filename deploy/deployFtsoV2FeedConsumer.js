@@ -12,17 +12,6 @@ async function main() {
 
   console.log("FtsoV2FeedConsumer deployed to:", ftsoV2FeedConsumer.address);
 
-  // Verify contract on block explorer (if not on a local network)
-  if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-    console.log("Waiting for block confirmations...");
-    await ftsoV2FeedConsumer.deployTransaction.wait(5);
-
-    await hre.run("verify:verify", {
-      address: ftsoV2FeedConsumer.address,
-      contract: "contracts/FtsoV2FeedConsumer.sol:FtsoV2FeedConsumer",
-    });
-    console.log("FtsoV2FeedConsumer contract verified on block explorer");
-  }
 }
 
 main()

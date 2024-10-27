@@ -19,21 +19,7 @@ async function main() {
 
   console.log("Jackpot deployed to:", jackpot.address);
     }
-
-//   // Verify contract on Etherscan (if not on a local network)
-//   if (hre.network.name !== "hardhat" && hre.network.name !== "localhost") {
-//     console.log("Waiting for block confirmations...");
-//     await jackpot.deployTransaction.wait(5);
-
-//     await hre.run("verify:verify", {
-//       address: jackpot.address,
-//       contract: "contracts/Jackpot.sol:Jackpot",
-//       constructorArguments: [jackTokenAddress],
-//     });
-//     console.log("Jackpot contract verified on Etherscan");
-//   }
-// }
-
+    
 main()
   .then(() => process.exit(0))
   .catch((error) => {

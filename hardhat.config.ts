@@ -20,12 +20,14 @@ const MNEMONIC = process.env.MNEMONIC
 
 // If you prefer to be authenticated using a private key, set a PRIVATE_KEY environment variable
 const PRIVATE_KEY = process.env.PRIVATE_KEY_MAIN
+const PRIVATE_KEY_TEST_1 = process.env.PRIVATE_KEY_TEST_1
+const PRIVATE_KEY_TEST_2 = process.env.PRIVATE_KEY_TEST_2
 
 
 const accounts: HttpNetworkAccountsUserConfig | undefined = MNEMONIC
     ? { mnemonic: MNEMONIC }
-    : PRIVATE_KEY
-      ? [PRIVATE_KEY]
+    : PRIVATE_KEY && PRIVATE_KEY_TEST_1 && PRIVATE_KEY_TEST_2
+      ? [PRIVATE_KEY, PRIVATE_KEY_TEST_1, PRIVATE_KEY_TEST_2]
       : undefined
 
 if (accounts == null) {
